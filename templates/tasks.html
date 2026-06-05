@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Мои задачи{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-list-check"></i> Мои задачи</h1>
+    <a href="{{ url_for('task_create') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Создать задачу
+    </a>
+</div>
+
+<!-- Панель фильтров и поиска -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <input type="text" name="search" class="form-control" placeholder="Поиск по названию..." 
+                       value="{{ current_filters.search }}">
+            </div>
+            <div class="col-md-2">
+                <select name="status" class="form-select">
+                    <option value="">Все статусы</option>
+                    <option value="pending" {% if current_filters.status == 'pending' %}selected{% endif %}>Ожидает</option>
+                    <option value="in_progress" {% if current_filters.status == 'in_progress' %}selected{% endif %}>В работе</option>
+                    <option value="completed" {% if current_filters.status == 'completed' %}selected{% endif %}>Выполнена</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="priority" class="form-select">
+                    <option value="">Все приоритеты</option>
+                    <option value="low" {% if current_filters.priority == 'low' %}selected{% endif %}>Низкий</option>
+                    <option value="medium" {% if current_filters.priority == 'medium' %}selected{% endif %}>Средний</option>
+                    <option value="high" {% if current_filters.priority == 'high' %}selected{% endif %}>Высокий</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="category" class="form-select">
+                    <option value="">Все категории</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if current_filters.category == cat.id|string %}selected{% endif %}>
+                            {{ cat.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="sort" class="form-select">
+                    <option value="deadline" {% if current_filters.sort == 'deadline' %}selected{% endif %}>По сроку</option>
+                    <option value="priority" {% if current_filters.sort == 'priority' %}selected{% endif %}>По приоритету</option>
+                    <option value="created_at" {% if current_filters.sort == 'created_at' %}selected{% endif %}>По дате создания</option>
+                    <option value="title" {% if current_filters.sort == 'title' %}selected{% endif %}>По названию</option>
+                </select>
+            </div>
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-secondary w-100">Применить</button>
+            </div>
+        </form>
+        <div class="mt-2">
+            <a href="{{ url_for('tasks') }}" class="btn btn-sm btn-link">Сбросить фильтры</a>
+        </div>
+    </div>
+</div>
+
+<!-- Таблица задач -->
+<div class="card">
+    <div class="card-body">
+        {% if tasks %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Категория</th>
+                            <th>Приоритет</th>
+                            <th>Статус</th>
+                            <th>Дедлайн</th>
+                            <th>Прогресс</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in tasks %}
+                            <tr class="{% if task.is_overdue %}task-overdue{% endif %} {% if task.status == 'completed' %}task-completed{% endif %}">
+                                <td>
+                                    <a href="{{ url_for('task_detail', task_id=task.id) }}">{{ task.title }}</a>
+                                    {% if task.subtasks %}
+                                        <br><small class="text-muted">{{ task.subtasks|selectattr('is_completed')|list|length }}/{{ task.subtasks|length }} подзадач</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if task.category %}
+                                        <span class="badge" style="background-color: {{ task.category.color }}">
+                                            {{ task.category.name }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if task.priority == 'high' %}
+                                        <span class="badge bg-danger">Высокий</span>
+                                    {% elif task.priority == 'medium' %}
+                                        <span class="badge bg-warning">Средний</span>
+                                    {% else %}
+                                        <span class="badge bg-info">Низкий</span>
+                                    {% endif %}
+                                </td>
+                               <td>
+    <form action="{{ url_for('task_change_status', task_id=task.id) }}" method="POST" class="d-inline">
+        <select name="status" class="form-select form-select-sm" style="width: 130px;" onchange="this.form.submit()">
+            <option value="pending" {% if task.status == 'pending' %}selected{% endif %}>
+                ⏳ Ожидает
+            </option>
+            <option value="in_progress" {% if task.status == 'in_progress' %}selected{% endif %}>
+                🔄 В работе
+            </option>
+            <option value="completed" {% if task.status == 'completed' %}selected{% endif %}>
+                ✅ Выполнена
+            </option>
+        </select>
+    </form>
+</td>
+                                <td>
+                                    {% if task.deadline %}
+                                        {{ task.deadline.strftime('%d.%m.%Y %H:%M') }}
+                                        {% if task.is_overdue %}
+                                            <span class="badge bg-danger">Просрочено</span>
+                                        {% endif %}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-success" style="width: {{ task.progress }}%">
+                                            {{ task.progress }}%
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('task_edit', task_id=task.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form action="{{ url_for('task_delete', task_id=task.id) }}" method="POST" class="d-inline" 
+                                          onsubmit="return confirm('Удалить задачу?')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-muted text-center py-4">У вас пока нет задач. 
+                <a href="{{ url_for('task_create') }}">Создайте первую задачу</a>
+            </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Автоматическая отправка формы при изменении чекбокса
+    document.querySelectorAll('.status-toggle').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            this.closest('form').submit();
+        });
+    });
+</script>
+{% endblock %}

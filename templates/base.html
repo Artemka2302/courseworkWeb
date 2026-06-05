@@ -15,6 +15,10 @@
         @media (max-width: 768px) {
             .sidebar { min-height: auto; }
         }
+        /* Стили для статусов */
+select option[value="pending"] { color: gray; }
+select option[value="in_progress"] { color: orange; }
+select option[value="completed"] { color: green; }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -36,8 +40,10 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">Задачи</a>
-                    </li>
+    <a class="nav-link" href="{{ url_for('tasks') }}">
+        <i class="bi bi-list-check"></i> Задачи
+    </a>
+</li>
                     <li class="nav-item">
                         <a class="nav-link" href="#">Категории</a>
                     </li>

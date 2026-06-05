@@ -36,3 +36,20 @@ class CategoryForm(FlaskForm):
     name = StringField('Название категории', validators=[DataRequired(), Length(max=50)])
     color = StringField('Цвет (HEX)', default='#6c757d')
     submit = SubmitField('Создать категорию')
+
+class TaskForm(FlaskForm):
+    title = StringField('Название задачи', validators=[DataRequired(), Length(max=200)])
+    description = TextAreaField('Описание')
+    status = SelectField('Статус', choices=[
+        ('pending', 'Ожидает'),
+        ('in_progress', 'В работе'),
+        ('completed', 'Выполнена')
+    ])
+    priority = SelectField('Приоритет', choices=[
+        ('low', 'Низкий'),
+        ('medium', 'Средний'),
+        ('high', 'Высокий')
+    ])
+    deadline = DateTimeField('Дедлайн (ГГГГ-ММ-ДД ЧЧ:ММ)', format='%Y-%m-%d %H:%M', validators=[DataRequired()])
+    category_id = SelectField('Категория', coerce=int, choices=[], default=0)  # Добавить это поле
+    submit = SubmitField('Сохранить')

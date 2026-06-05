@@ -3,7 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, date
+from werkzeug.utils import secure_filename
 import os
 
 from models import db, User, Task, Category, Tag, Subtask
@@ -113,6 +114,198 @@ def dashboard():
 @app.route('/test')
 def test():
     return render_template('index.html', title='Тест', items=['Flask', 'Jinja2', 'SQLAlchemy'])
+
+# ========== Управление задачами (CRUD) ==========
+
+@app.route('/tasks')
+@login_required
+def tasks():
+    """Список всех задач пользователя"""
+    # Базовый запрос - только задачи текущего пользователя
+    query = Task.query.filter_by(user_id=current_user.id)
+    
+    # Получаем параметры фильтрации из URL
+    status_filter = request.args.get('status', '')
+    priority_filter = request.args.get('priority', '')
+    category_filter = request.args.get('category', '')
+    
+    # Применяем фильтры
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+    if priority_filter:
+        query = query.filter_by(priority=priority_filter)
+    if category_filter and category_filter.isdigit():
+        query = query.filter_by(category_id=int(category_filter))
+    
+    # Сортировка
+    sort_by = request.args.get('sort', 'deadline')
+    if sort_by == 'deadline':
+        query = query.order_by(Task.deadline.asc())
+    elif sort_by == 'priority':
+        query = query.order_by(Task.priority.desc())
+    elif sort_by == 'created_at':
+        query = query.order_by(Task.created_at.desc())
+    elif sort_by == 'title':
+        query = query.order_by(Task.title.asc())
+    else:
+        query = query.order_by(Task.deadline.asc())
+    
+    # Поиск
+    search_query = request.args.get('search', '')
+    if search_query:
+        query = query.filter(
+            Task.title.contains(search_query) | Task.description.contains(search_query)
+        )
+    
+    tasks_list = query.all()
+    
+    # Получаем категории пользователя для фильтра
+    categories = Category.query.filter_by(user_id=current_user.id).all()
+    
+    return render_template('tasks.html', 
+                         tasks=tasks_list, 
+                         categories=categories,
+                         current_filters={
+                             'status': status_filter,
+                             'priority': priority_filter,
+                             'category': category_filter,
+                             'sort': sort_by,
+                             'search': search_query
+                         })
+
+@app.route('/task/create', methods=['GET', 'POST'])
+@login_required
+def task_create():
+    """Создание новой задачи"""
+    form = TaskForm()
+    
+    # Загружаем категории пользователя для выбора
+    categories = Category.query.filter_by(user_id=current_user.id).all()
+    form.category_id.choices = [(0, 'Без категории')] + [(c.id, c.name) for c in categories]
+    
+    if form.validate_on_submit():
+        task = Task(
+            title=form.title.data,
+            description=form.description.data,
+            status=form.status.data,
+            priority=form.priority.data,
+            deadline=form.deadline.data,
+            category_id=form.category_id.data if form.category_id.data != 0 else None,
+            user_id=current_user.id
+        )
+        db.session.add(task)
+        db.session.commit()
+        
+        flash('Задача успешно создана!', 'success')
+        return redirect(url_for('tasks'))
+    
+    return render_template('task_form.html', form=form, title='Создать задачу')
+
+@app.route('/task/<int:task_id>')
+@login_required
+def task_detail(task_id):
+    """Просмотр одной задачи"""
+    task = Task.query.get_or_404(task_id)
+    
+    # Проверяем, что задача принадлежит текущему пользователю
+    if task.user_id != current_user.id:
+        flash('У вас нет доступа к этой задаче', 'danger')
+        return redirect(url_for('tasks'))
+    
+    return render_template('task_detail.html', task=task)
+
+@app.route('/task/<int:task_id>/edit', methods=['GET', 'POST'])
+@login_required
+def task_edit(task_id):
+    """Редактирование задачи"""
+    task = Task.query.get_or_404(task_id)
+    
+    # Проверяем доступ
+    if task.user_id != current_user.id:
+        flash('У вас нет доступа к этой задаче', 'danger')
+        return redirect(url_for('tasks'))
+    
+    form = TaskForm(obj=task)
+    
+    # Загружаем категории
+    categories = Category.query.filter_by(user_id=current_user.id).all()
+    form.category_id.choices = [(0, 'Без категории')] + [(c.id, c.name) for c in categories]
+    
+    if form.validate_on_submit():
+        task.title = form.title.data
+        task.description = form.description.data
+        task.status = form.status.data
+        task.priority = form.priority.data
+        task.deadline = form.deadline.data
+        task.category_id = form.category_id.data if form.category_id.data != 0 else None
+        task.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        flash('Задача успешно обновлена!', 'success')
+        return redirect(url_for('task_detail', task_id=task.id))
+    
+    # Заполняем форму текущими значениями
+    form.category_id.data = task.category_id if task.category_id else 0
+    
+    return render_template('task_form.html', form=form, title='Редактировать задачу', task=task)
+
+@app.route('/task/<int:task_id>/delete', methods=['POST'])
+@login_required
+def task_delete(task_id):
+    """Удаление задачи"""
+    task = Task.query.get_or_404(task_id)
+    
+    if task.user_id != current_user.id:
+        flash('У вас нет доступа к этой задаче', 'danger')
+        return redirect(url_for('tasks'))
+    
+    db.session.delete(task)
+    db.session.commit()
+    flash('Задача удалена', 'success')
+    return redirect(url_for('tasks'))
+
+@app.route('/task/<int:task_id>/toggle-status', methods=['POST'])
+@login_required
+def task_toggle_status(task_id):
+    """Быстрое переключение статуса задачи (для чекбокса)"""
+    task = Task.query.get_or_404(task_id)
+    
+    if task.user_id != current_user.id:
+        return {'error': 'Нет доступа'}, 403
+    
+    if task.status == 'completed':
+        task.status = 'pending'
+    else:
+        task.status = 'completed'
+    
+    db.session.commit()
+    return {'success': True, 'new_status': task.status}
+
+
+@app.route('/task/<int:task_id>/change-status', methods=['POST'])
+@login_required
+def task_change_status(task_id):
+    """Изменение статуса задачи через выпадающий список"""
+    task = Task.query.get_or_404(task_id)
+    
+    if task.user_id != current_user.id:
+        flash('Нет доступа к этой задаче', 'danger')
+        return redirect(url_for('tasks'))
+    
+    new_status = request.form.get('status')
+    if new_status in ['pending', 'in_progress', 'completed']:
+        task.status = new_status
+        db.session.commit()
+        
+        # Сообщение об успехе
+        status_names = {
+            'pending': 'Ожидает',
+            'in_progress': 'В работе',
+            'completed': 'Выполнена'
+        }
+        flash(f'Статус задачи "{task.title}" изменен на "{status_names[new_status]}"', 'success')
+    
+    return redirect(url_for('tasks'))
 
 if __name__ == '__main__':
     with app.app_context():
