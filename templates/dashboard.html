@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Дашборд - TaskMaster{% endblock %}
+
+{% block content %}
+<h1 class="mb-4"><i class="bi bi-speedometer2"></i> Дашборд</h1>
+
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card bg-primary text-white shadow">
+            <div class="card-body">
+                <h5 class="card-title">Всего задач</h5>
+                <h2 class="display-4">{{ total_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-success text-white shadow">
+            <div class="card-body">
+                <h5 class="card-title">Выполнено</h5>
+                <h2 class="display-4">{{ completed_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-danger text-white shadow">
+            <div class="card-body">
+                <h5 class="card-title">Просрочено</h5>
+                <h2 class="display-4">{{ overdue_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-warning text-dark shadow">
+            <div class="card-body">
+                <h5 class="card-title">В работе</h5>
+                <h2 class="display-4">{{ in_progress_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">Прогресс выполнения</h5>
+            </div>
+            <div class="card-body text-center">
+                <div class="display-1">{{ completion_rate }}%</div>
+                <div class="progress mt-3" style="height: 20px;">
+                    <div class="progress-bar bg-success" style="width: {{ completion_rate }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0">Быстрые действия</h5>
+            </div>
+            <div class="card-body">
+                <a href="#" class="btn btn-primary w-100 mb-2">
+                    <i class="bi bi-plus-circle"></i> Создать задачу
+                </a>
+                <a href="#" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-calendar"></i> Перейти к календарю
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
