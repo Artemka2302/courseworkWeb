@@ -701,6 +701,54 @@ def calendar_view():
                          next_year=next_year)
 
 
+# ========== Личный кабинет ==========
+
+@app.route('/profile')
+@login_required
+def profile():
+    """Личный кабинет пользователя"""
+    return render_template('profile.html', user=current_user)
+
+@app.route('/profile/change-password', methods=['POST'])
+@login_required
+def change_password():
+    """Смена пароля"""
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+    
+    # Проверяем текущий пароль
+    if not check_password_hash(current_user.password_hash, current_password):
+        flash('Текущий пароль введен неверно', 'danger')
+        return redirect(url_for('profile'))
+    
+    # Проверяем длину нового пароля
+    if len(new_password) < 6:
+        flash('Новый пароль должен содержать минимум 6 символов', 'danger')
+        return redirect(url_for('profile'))
+    
+    # Проверяем совпадение паролей
+    if new_password != confirm_password:
+        flash('Пароли не совпадают', 'danger')
+        return redirect(url_for('profile'))
+    
+    # Меняем пароль
+    current_user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+    
+    flash('Пароль успешно изменен!', 'success')
+    return redirect(url_for('profile'))
+
+@app.route('/profile/settings', methods=['POST'])
+@login_required
+def profile_settings():
+    """Обновление настроек профиля"""
+    timezone = request.form.get('timezone', 'Europe/Moscow')
+    current_user.timezone = timezone
+    db.session.commit()
+    
+    flash('Настройки сохранены!', 'success')
+    return redirect(url_for('profile'))
 
 
 if __name__ == '__main__':

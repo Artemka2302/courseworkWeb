@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Личный кабинет - TaskMaster{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <!-- Информация о пользователе -->
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-person-circle"></i> Профиль</h5>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <div class="display-1">
+                        <i class="bi bi-person-circle"></i>
+                    </div>
+                </div>
+                <h4>{{ user.username }}</h4>
+                <p class="text-muted">{{ user.email }}</p>
+                <hr>
+                <p class="small text-muted">
+                    <i class="bi bi-calendar"></i> Зарегистрирован: {{ user.registered_at.strftime('%d.%m.%Y') }}
+                </p>
+                <p class="small text-muted">
+                    <i class="bi bi-shield"></i> Роль: 
+                    {% if user.role == 'admin' %}
+                        <span class="badge bg-danger">Администратор</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Пользователь</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <!-- Смена пароля -->
+        <div class="card shadow mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-key"></i> Смена пароля</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('change_password') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label">Текущий пароль</label>
+                        <input type="password" class="form-control" id="current_password" 
+                               name="current_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Новый пароль</label>
+                        <input type="password" class="form-control" id="new_password" 
+                               name="new_password" required>
+                        <small class="text-muted">Минимум 6 символов</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Подтвердите новый пароль</label>
+                        <input type="password" class="form-control" id="confirm_password" 
+                               name="confirm_password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Сменить пароль
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Настройки -->
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Настройки</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('profile_settings') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="timezone" class="form-label">Часовой пояс</label>
+                        <select class="form-select" id="timezone" name="timezone">
+                            <option value="Europe/Moscow" {% if user.timezone == 'Europe/Moscow' %}selected{% endif %}>
+                                Москва (UTC+3)
+                            </option>
+                            <option value="Europe/Kaliningrad" {% if user.timezone == 'Europe/Kaliningrad' %}selected{% endif %}>
+                                Калининград (UTC+2)
+                            </option>
+                            <option value="Europe/Samara" {% if user.timezone == 'Europe/Samara' %}selected{% endif %}>
+                                Самара (UTC+4)
+                            </option>
+                            <option value="Asia/Yekaterinburg" {% if user.timezone == 'Asia/Yekaterinburg' %}selected{% endif %}>
+                                Екатеринбург (UTC+5)
+                            </option>
+                            <option value="Asia/Novosibirsk" {% if user.timezone == 'Asia/Novosibirsk' %}selected{% endif %}>
+                                Новосибирск (UTC+7)
+                            </option>
+                            <option value="Asia/Vladivostok" {% if user.timezone == 'Asia/Vladivostok' %}selected{% endif %}>
+                                Владивосток (UTC+10)
+                            </option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="bi bi-save"></i> Сохранить настройки
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Статистика пользователя -->
+        <div class="card shadow mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Моя статистика</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <h3>{{ user.tasks|length }}</h3>
+                        <small class="text-muted">Всего задач</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <h3>{{ user.tasks|selectattr('status', 'equalto', 'completed')|list|length }}</h3>
+                        <small class="text-muted">Выполнено</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <h3>{{ user.categories|length }}</h3>
+                        <small class="text-muted">Категорий</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <h3>{{ user.tasks|selectattr('is_overdue')|list|length }}</h3>
+                        <small class="text-muted">Просрочено</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4 text-center">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Назад на дашборд
+    </a>
+</div>
+{% endblock %}

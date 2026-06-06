@@ -34,32 +34,45 @@ select option[value="completed"] { color: green; }
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('dashboard') }}">
-                            <i class="bi bi-speedometer2"></i> Дашборд
-                        </a>
-                    </li>
-                    <li class="nav-item">
-    <a class="nav-link" href="{{ url_for('tasks') }}">
-        <i class="bi bi-list-check"></i> Задачи
-    </a>
-</li>
-                    <li class="nav-item">
-    <a class="nav-link" href="{{ url_for('categories') }}">
-        <i class="bi bi-tags"></i> Категории
-    </a>
-</li>
-                    <li class="nav-item">
-    <a class="nav-link" href="{{ url_for('calendar_view') }}">
-        <i class="bi bi-calendar3"></i> Календарь
-    </a>
-</li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('logout') }}">
-                            <i class="bi bi-box-arrow-right"></i> Выйти ({{ current_user.username }})
-                        </a>
-                    </li>
-                </ul>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('dashboard') }}">
+            <i class="bi bi-speedometer2"></i> Дашборд
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('tasks') }}">
+            <i class="bi bi-list-check"></i> Задачи
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('categories') }}">
+            <i class="bi bi-tags"></i> Категории
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('calendar_view') }}">
+            <i class="bi bi-calendar3"></i> Календарь
+        </a>
+    </li>
+    <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+            <i class="bi bi-person-circle"></i> {{ current_user.username }}
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+                <a class="dropdown-item" href="{{ url_for('profile') }}">
+                    <i class="bi bi-person"></i> Профиль
+                </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+                <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
+                    <i class="bi bi-box-arrow-right"></i> Выйти
+                </a>
+            </li>
+        </ul>
+    </li>
+</ul>
             </div>
         </div>
     </nav>
