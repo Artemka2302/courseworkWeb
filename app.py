@@ -98,8 +98,7 @@ def logout():
     flash('Вы вышли из системы', 'info')
     return redirect(url_for('login'))
 
-@app.route('/dashboard')
-@login_required
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -591,6 +590,117 @@ def subtask_delete(subtask_id):
     flash('Подзадача удалена', 'success')
     
     return redirect(url_for('task_detail', task_id=task_id))
+
+# ========== Календарь ==========
+
+@app.route('/calendar')
+@login_required
+def calendar_view():
+    """Календарь с дедлайнами задач"""
+    # Получаем месяц и год из параметров URL
+    current_year = request.args.get('year', type=int)
+    current_month = request.args.get('month', type=int)
+    
+    now = datetime.utcnow()
+    if not current_year:
+        current_year = now.year
+    if not current_month:
+        current_month = now.month
+    
+    # Первый день месяца
+    first_day = date(current_year, current_month, 1)
+    
+    # Определяем день недели первого дня (0 - понедельник, 6 - воскресенье)
+    start_weekday = first_day.weekday()
+    
+    # Количество дней в месяце
+    if current_month == 12:
+        next_month = date(current_year + 1, 1, 1)
+    else:
+        next_month = date(current_year, current_month + 1, 1)
+    days_in_month = (next_month - first_day).days
+    
+    # Собираем все дни месяца в список
+    calendar_days = []
+    for i in range(1, days_in_month + 1):
+        calendar_days.append(date(current_year, current_month, i))
+    
+    # Получаем задачи пользователя с дедлайнами
+    tasks = Task.query.filter_by(user_id=current_user.id).all()
+    
+    # Группируем задачи по дате дедлайна
+    tasks_by_date = {}
+    for task in tasks:
+        if task.deadline:
+            task_date = task.deadline.date()
+            if task_date not in tasks_by_date:
+                tasks_by_date[task_date] = []
+            tasks_by_date[task_date].append(task)
+    
+    # Создаем календарную сетку (6 недель по 7 дней)
+    calendar_grid = []
+    week = []
+    
+    # Добавляем пустые дни перед первым днем месяца
+    for i in range(start_weekday):
+        week.append(None)
+    
+    # Добавляем дни месяца
+    for day in calendar_days:
+        day_info = {
+            'date': day,
+            'day': day.day,
+            'tasks': tasks_by_date.get(day, []),
+            'is_today': day == now.date()
+        }
+        week.append(day_info)
+        
+        if len(week) == 7:
+            calendar_grid.append(week)
+            week = []
+    
+    # Добавляем пустые дни в конец последней недели
+    if week:
+        while len(week) < 7:
+            week.append(None)
+        calendar_grid.append(week)
+    
+    # Названия дней недели
+    weekdays = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС']
+    
+    # Названия месяцев на русском
+    month_names = {
+        1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',
+        5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',
+        9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь'
+    }
+    
+    # Навигация по месяцам
+    prev_month = current_month - 1
+    prev_year = current_year
+    if prev_month == 0:
+        prev_month = 12
+        prev_year -= 1
+    
+    next_month = current_month + 1
+    next_year = current_year
+    if next_month == 13:
+        next_month = 1
+        next_year += 1
+    
+    return render_template('calendar.html',
+                         calendar_grid=calendar_grid,
+                         weekdays=weekdays,
+                         month_name=month_names[current_month],
+                         year=current_year,
+                         current_month=current_month,
+                         current_year=current_year,
+                         prev_month=prev_month,
+                         prev_year=prev_year,
+                         next_month=next_month,
+                         next_year=next_year)
+
+
 
 
 if __name__ == '__main__':

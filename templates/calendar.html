@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Календарь задач - TaskMaster{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-calendar3"></i> Календарь задач</h1>
+    <div>
+        <a href="{{ url_for('tasks') }}" class="btn btn-outline-primary">
+            <i class="bi bi-list-check"></i> К списку задач
+        </a>
+    </div>
+</div>
+
+<!-- Навигация по месяцам -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <a href="{{ url_for('calendar_view', year=prev_year, month=prev_month) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-chevron-left"></i> {{ prev_month }}.{{ prev_year }}
+    </a>
+    <h2 class="mb-0">{{ month_name }} {{ year }}</h2>
+    <a href="{{ url_for('calendar_view', year=next_year, month=next_month) }}" class="btn btn-outline-secondary">
+        {{ next_month }}.{{ next_year }} <i class="bi bi-chevron-right"></i>
+    </a>
+</div>
+
+<!-- Календарь -->
+<div class="card shadow">
+    <div class="card-body p-3">
+        <div class="table-responsive">
+            <table class="table table-bordered text-center calendar-table">
+                <thead>
+                    <tr class="table-secondary">
+                        {% for weekday in weekdays %}
+                            <th style="width: 14.28%">{{ weekday }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for week in calendar_grid %}
+                        <tr style="height: 100px;">
+                            {% for day in week %}
+                                {% if day %}
+                                    <td class="{% if day.is_today %}table-primary{% endif %} align-top"
+                                        style="cursor: pointer; vertical-align: top;">
+                                        <div class="fw-bold mb-1">
+                                            {{ day.day }}
+                                            {% if day.tasks %}
+                                                <span class="badge bg-danger rounded-pill ms-1">
+                                                    {{ day.tasks|length }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="small">
+                                            {% for task in day.tasks[:3] %}
+                                                <div class="mb-1 text-truncate" style="max-width: 100%;">
+                                                    <span class="badge 
+                                                        {% if task.priority == 'high' %}bg-danger
+                                                        {% elif task.priority == 'medium' %}bg-warning
+                                                        {% else %}bg-info{% endif %}">
+                                                        {{ task.title|truncate(15) }}
+                                                    </span>
+                                                </div>
+                                            {% endfor %}
+                                            {% if day.tasks|length > 3 %}
+                                                <div class="text-muted small">
+                                                    +{{ day.tasks|length - 3 }} ещё
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                {% else %}
+                                    <td class="bg-light"></td>
+                                {% endif %}
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Легенда -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Легенда</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <span class="badge bg-primary">Синий фон</span> — сегодня
+                    </div>
+                    <div class="col-md-3">
+                        <span class="badge bg-danger">Красный бейдж</span> — количество задач
+                    </div>
+                    <div class="col-md-3">
+                        <span class="badge bg-danger">Красный</span> — высокий приоритет
+                    </div>
+                    <div class="col-md-3">
+                        <span class="badge bg-warning">Жёлтый</span> — средний приоритет
+                    </div>
+                    <div class="col-md-3 mt-2">
+                        <span class="badge bg-info">Голубой</span> — низкий приоритет
+                    </div>
+                    <div class="col-md-3 mt-2">
+                        <i class="bi bi-chevron-left"></i> / <i class="bi bi-chevron-right"></i> — навигация по месяцам
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для просмотра задач дня -->
+<div class="modal fade" id="tasksModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Задачи на <span id="modalDate"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalTasksList">
+                <!-- Список задач будет загружен сюда -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .calendar-table td {
+        transition: background-color 0.2s;
+    }
+    .calendar-table td:hover {
+        background-color: #f0f0f0 !important;
+        cursor: pointer;
+    }
+    .calendar-table .table-primary:hover {
+        background-color: #cfe2ff !important;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Обработчик клика по ячейке календаря
+    document.querySelectorAll('.calendar-table td').forEach(cell => {
+        cell.addEventListener('click', function(e) {
+            // Не открываем модалку если клик на пустой ячейке или на ссылке
+            if (e.target.tagName === 'A') return;
+            if (!this.classList.contains('align-top')) return;
+            
+            const day = this.querySelector('.fw-bold').textContent.trim();
+            const month = '{{ current_month }}';
+            const year = '{{ current_year }}';
+            const dateStr = `${day}.${month}.${year}`;
+            
+            // Собираем задачи из ячейки
+            const tasks = [];
+            const taskElements = this.querySelectorAll('.badge:not(.bg-danger.rounded-pill)');
+            taskElements.forEach(el => {
+                let priority = '';
+                if (el.classList.contains('bg-danger')) priority = 'high';
+                else if (el.classList.contains('bg-warning')) priority = 'medium';
+                else if (el.classList.contains('bg-info')) priority = 'low';
+                
+                tasks.push({
+                    title: el.textContent.trim(),
+                    priority: priority
+                });
+            });
+            
+            // Отображаем модальное окно
+            document.getElementById('modalDate').textContent = dateStr;
+            const modalBody = document.getElementById('modalTasksList');
+            
+            if (tasks.length > 0) {
+                let html = '<div class="list-group">';
+                tasks.forEach(task => {
+                    let priorityClass = '';
+                    let priorityText = '';
+                    if (task.priority === 'high') {
+                        priorityClass = 'bg-danger';
+                        priorityText = 'Высокий';
+                    } else if (task.priority === 'medium') {
+                        priorityClass = 'bg-warning';
+                        priorityText = 'Средний';
+                    } else {
+                        priorityClass = 'bg-info';
+                        priorityText = 'Низкий';
+                    }
+                    html += `
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>${task.title}</span>
+                                <span class="badge ${priorityClass}">${priorityText}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                modalBody.innerHTML = html;
+            } else {
+                modalBody.innerHTML = '<p class="text-muted">Нет задач на этот день</p>';
+            }
+            
+            new bootstrap.Modal(document.getElementById('tasksModal')).show();
+        });
+    });
+</script>
+{% endblock %}
