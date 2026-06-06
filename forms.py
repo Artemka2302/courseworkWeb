@@ -34,8 +34,18 @@ class TaskForm(FlaskForm):
 
 class CategoryForm(FlaskForm):
     name = StringField('Название категории', validators=[DataRequired(), Length(max=50)])
-    color = StringField('Цвет (HEX)', default='#6c757d')
-    submit = SubmitField('Создать категорию')
+    color = SelectField('Цвет', choices=[
+        ('#6c757d', 'Серый'),
+        ('#0d6efd', 'Синий'),
+        ('#198754', 'Зеленый'),
+        ('#dc3545', 'Красный'),
+        ('#fd7e14', 'Оранжевый'),
+        ('#6f42c1', 'Фиолетовый'),
+        ('#d63384', 'Розовый'),
+        ('#20c997', 'Бирюзовый'),
+        ('#ffc107', 'Желтый'),
+    ], default='#6c757d')
+    submit = SubmitField('Сохранить')
 
 class TaskForm(FlaskForm):
     title = StringField('Название задачи', validators=[DataRequired(), Length(max=200)])

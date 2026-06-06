@@ -7,6 +7,7 @@ from datetime import datetime, date
 from werkzeug.utils import secure_filename
 import os
 
+
 from models import db, User, Task, Category, Tag, Subtask
 from forms import RegistrationForm, LoginForm, TaskForm, CategoryForm
 
@@ -306,6 +307,96 @@ def task_change_status(task_id):
         flash(f'Статус задачи "{task.title}" изменен на "{status_names[new_status]}"', 'success')
     
     return redirect(url_for('tasks'))
+
+# ========== Управление категориями ==========
+
+@app.route('/categories')
+@login_required
+def categories():
+    """Страница управления категориями"""
+    user_categories = Category.query.filter_by(user_id=current_user.id).all()
+    return render_template('categories.html', categories=user_categories)
+
+@app.route('/category/create', methods=['GET', 'POST'])
+@login_required
+def category_create():
+    """Создание новой категории"""
+    form = CategoryForm()
+    
+    if form.validate_on_submit():
+        # Проверяем, нет ли уже такой категории у пользователя
+        existing = Category.query.filter_by(
+            user_id=current_user.id, 
+            name=form.name.data
+        ).first()
+        
+        if existing:
+            flash('Категория с таким названием уже существует', 'danger')
+            return redirect(url_for('categories'))
+        
+        category = Category(
+            name=form.name.data,
+            color=form.color.data,
+            user_id=current_user.id
+        )
+        db.session.add(category)
+        db.session.commit()
+        flash(f'Категория "{category.name}" создана!', 'success')
+        return redirect(url_for('categories'))
+    
+    return render_template('category_form.html', form=form, title='Создать категорию')
+
+@app.route('/category/<int:category_id>/edit', methods=['GET', 'POST'])
+@login_required
+def category_edit(category_id):
+    """Редактирование категории"""
+    category = Category.query.get_or_404(category_id)
+    
+    if category.user_id != current_user.id:
+        flash('Нет доступа к этой категории', 'danger')
+        return redirect(url_for('categories'))
+    
+    form = CategoryForm(obj=category)
+    
+    if form.validate_on_submit():
+        # Проверяем уникальность имени
+        existing = Category.query.filter_by(
+            user_id=current_user.id, 
+            name=form.name.data
+        ).first()
+        
+        if existing and existing.id != category_id:
+            flash('Категория с таким названием уже существует', 'danger')
+            return redirect(url_for('categories'))
+        
+        category.name = form.name.data
+        category.color = form.color.data
+        db.session.commit()
+        flash(f'Категория "{category.name}" обновлена!', 'success')
+        return redirect(url_for('categories'))
+    
+    return render_template('category_form.html', form=form, title='Редактировать категорию', category=category)
+
+@app.route('/category/<int:category_id>/delete', methods=['POST'])
+@login_required
+def category_delete(category_id):
+    """Удаление категории"""
+    category = Category.query.get_or_404(category_id)
+    
+    if category.user_id != current_user.id:
+        flash('Нет доступа к этой категории', 'danger')
+        return redirect(url_for('categories'))
+    
+    # У задач, у которых была эта категория, сбрасываем category_id на NULL
+    tasks_with_category = Task.query.filter_by(category_id=category_id).all()
+    for task in tasks_with_category:
+        task.category_id = None
+    
+    db.session.delete(category)
+    db.session.commit()
+    flash('Категория удалена', 'success')
+    return redirect(url_for('categories'))
+
 
 if __name__ == '__main__':
     with app.app_context():

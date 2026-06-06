@@ -45,8 +45,10 @@ select option[value="completed"] { color: green; }
     </a>
 </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">Категории</a>
-                    </li>
+    <a class="nav-link" href="{{ url_for('categories') }}">
+        <i class="bi bi-tags"></i> Категории
+    </a>
+</li>
                     <li class="nav-item">
                         <a class="nav-link" href="#">Календарь</a>
                     </li>

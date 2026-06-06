@@ -88,15 +88,15 @@
                                         <br><small class="text-muted">{{ task.subtasks|selectattr('is_completed')|list|length }}/{{ task.subtasks|length }} подзадач</small>
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {% if task.category %}
-                                        <span class="badge" style="background-color: {{ task.category.color }}">
-                                            {{ task.category.name }}
-                                        </span>
-                                    {% else %}
-                                        <span class="text-muted">—</span>
-                                    {% endif %}
-                                </td>
+                               <td>
+    {% if task.category %}
+        <span class="badge" style="background-color: {{ task.category.color }}">
+            {{ task.category.name }}
+        </span>
+    {% else %}
+        <span class="text-muted">—</span>
+    {% endif %}
+</td>
                                 <td>
                                     {% if task.priority == 'high' %}
                                         <span class="badge bg-danger">Высокий</span>
