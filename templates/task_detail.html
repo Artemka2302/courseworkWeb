@@ -10,7 +10,7 @@
             <i class="bi bi-pencil"></i> Редактировать
         </a>
         <form action="{{ url_for('task_delete', task_id=task.id) }}" method="POST" class="d-inline"
-              onsubmit="return confirm('Удалить задачу?')">
+              onsubmit="return confirm('Удалить задачу? Все подзадачи также будут удалены')">
             <button type="submit" class="btn btn-outline-danger">
                 <i class="bi bi-trash"></i> Удалить
             </button>
@@ -21,68 +21,102 @@
 
 <div class="row">
     <div class="col-md-8">
+        <!-- Описание задачи -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Описание</h5>
+                <h5 class="mb-0"><i class="bi bi-file-text"></i> Описание</h5>
             </div>
             <div class="card-body">
                 {% if task.description %}
-                    {{ task.description|safe }}
+                    {{ task.description|replace('\n', '<br>')|safe }}
                 {% else %}
                     <p class="text-muted">Нет описания</p>
                 {% endif %}
             </div>
         </div>
         
-        <!-- Подзадачи -->
+        <!-- ПОДЗАДАЧИ -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Подзадачи (прогресс: {{ task.progress }}%)</h5>
+                <h5 class="mb-0"><i class="bi bi-diagram-2"></i> Подзадачи</h5>
             </div>
             <div class="card-body">
-                <div class="progress mb-3">
-                    <div class="progress-bar bg-success" style="width: {{ task.progress }}%">
-                        {{ task.progress }}%
+                <!-- Прогресс-бар -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Прогресс выполнения</span>
+                        <span><strong>{{ task.progress }}%</strong></span>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar bg-success progress-bar-striped" 
+                             style="width: {{ task.progress }}%">
+                            {{ task.progress }}%
+                        </div>
                     </div>
                 </div>
                 
+                <!-- Форма добавления новой подзадачи -->
+                <form action="{{ url_for('subtask_create', task_id=task.id) }}" method="POST" class="mb-3">
+                    <div class="input-group">
+                        <input type="text" name="title" class="form-control" 
+                               placeholder="Название новой подзадачи..." required>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-plus-lg"></i> Добавить
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Список подзадач -->
                 {% if task.subtasks %}
-                    <ul class="list-group">
+                    <div class="list-group">
                         {% for subtask in task.subtasks %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
                                 <div class="form-check">
-                                    <input type="checkbox" class="form-check-input subtask-toggle" 
-                                           data-subtask-id="{{ subtask.id }}"
-                                           {% if subtask.is_completed %}checked{% endif %}>
-                                    <label class="form-check-label {% if subtask.is_completed %}text-decoration-line-through{% endif %}">
+                                    <form action="{{ url_for('subtask_toggle', subtask_id=subtask.id) }}" 
+                                          method="POST" class="d-inline">
+                                        <input type="checkbox" class="form-check-input subtask-checkbox" 
+                                               {% if subtask.is_completed %}checked{% endif %}
+                                               onchange="this.form.submit()">
+                                    </form>
+                                    <label class="form-check-label {% if subtask.is_completed %}text-decoration-line-through text-muted{% endif %}">
                                         {{ subtask.title }}
                                     </label>
                                 </div>
-                            </li>
+                                <form action="{{ url_for('subtask_delete', subtask_id=subtask.id) }}" 
+                                      method="POST" class="d-inline"
+                                      onsubmit="return confirm('Удалить подзадачу?')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
                         {% endfor %}
-                    </ul>
+                    </div>
                 {% else %}
-                    <p class="text-muted">Нет подзадач</p>
+                    <p class="text-muted text-center py-3">
+                        <i class="bi bi-info-circle"></i> Нет подзадач. Добавьте первую выше!
+                    </p>
                 {% endif %}
             </div>
         </div>
     </div>
     
     <div class="col-md-4">
+        <!-- Информация о задаче -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Информация</h5>
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Информация</h5>
             </div>
             <div class="card-body">
                 <p><strong>Статус:</strong> 
-    <form action="{{ url_for('task_change_status', task_id=task.id) }}" method="POST" class="d-inline">
-        <select name="status" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="this.form.submit()">
-            <option value="pending" {% if task.status == 'pending' %}selected{% endif %}>⏳ Ожидает</option>
-            <option value="in_progress" {% if task.status == 'in_progress' %}selected{% endif %}>🔄 В работе</option>
-            <option value="completed" {% if task.status == 'completed' %}selected{% endif %}>✅ Выполнена</option>
-        </select>
-    </form>
-</p>
+                    <form action="{{ url_for('task_change_status', task_id=task.id) }}" method="POST" class="d-inline">
+                        <select name="status" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="this.form.submit()">
+                            <option value="pending" {% if task.status == 'pending' %}selected{% endif %}>⏳ Ожидает</option>
+                            <option value="in_progress" {% if task.status == 'in_progress' %}selected{% endif %}>🔄 В работе</option>
+                            <option value="completed" {% if task.status == 'completed' %}selected{% endif %}>✅ Выполнена</option>
+                        </select>
+                    </form>
+                </p>
                 <p><strong>Приоритет:</strong>
                     {% if task.priority == 'high' %}
                         <span class="badge bg-danger">Высокий</span>
@@ -112,6 +146,21 @@
                     {% endif %}
                 </p>
                 <p><strong>Создана:</strong> {{ task.created_at.strftime('%d.%m.%Y') }}</p>
+                <p><strong>Подзадач:</strong> 
+                    {{ task.subtasks|length }} всего, 
+                    {{ task.subtasks|selectattr('is_completed')|list|length }} выполнено
+                </p>
+            </div>
+        </div>
+        
+        <!-- Подсказка -->
+        <div class="card bg-light">
+            <div class="card-body">
+                <h6><i class="bi bi-lightbulb"></i> Совет</h6>
+                <p class="small text-muted mb-0">
+                    Разбивайте большие задачи на маленькие подзадачи. 
+                    Прогресс будет рассчитываться автоматически!
+                </p>
             </div>
         </div>
     </div>
@@ -120,22 +169,10 @@
 
 {% block extra_js %}
 <script>
-    // Переключение подзадач через AJAX
-    document.querySelectorAll('.subtask-toggle').forEach(checkbox => {
+    // Автоматическая отправка формы при клике на чекбокс подзадачи
+    document.querySelectorAll('.subtask-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', function() {
-            const subtaskId = this.dataset.subtaskId;
-            fetch(`/subtask/${subtaskId}/toggle`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload(); // Обновляем страницу для обновления прогресса
-                }
-            });
+            this.closest('form').submit();
         });
     });
 </script>

@@ -398,6 +398,77 @@ def category_delete(category_id):
     return redirect(url_for('categories'))
 
 
+# ========== Управление подзадачами ==========
+
+@app.route('/subtask/create/<int:task_id>', methods=['POST'])
+@login_required
+def subtask_create(task_id):
+    """Создание новой подзадачи"""
+    task = Task.query.get_or_404(task_id)
+    
+    # Проверяем доступ
+    if task.user_id != current_user.id:
+        flash('Нет доступа к этой задаче', 'danger')
+        return redirect(url_for('tasks'))
+    
+    subtask_title = request.form.get('title', '').strip()
+    if subtask_title:
+        subtask = Subtask(
+            title=subtask_title,
+            task_id=task_id
+        )
+        db.session.add(subtask)
+        db.session.commit()
+        flash('Подзадача добавлена!', 'success')
+    else:
+        flash('Название подзадачи не может быть пустым', 'danger')
+    
+    return redirect(url_for('task_detail', task_id=task_id))
+
+@app.route('/subtask/<int:subtask_id>/toggle', methods=['POST'])
+@login_required
+def subtask_toggle(subtask_id):
+    """Переключение статуса подзадачи (выполнена/не выполнена)"""
+    subtask = Subtask.query.get_or_404(subtask_id)
+    task = subtask.parent_task
+    
+    # Проверяем доступ через родительскую задачу
+    if task.user_id != current_user.id:
+        flash('Нет доступа', 'danger')
+        return redirect(url_for('tasks'))
+    
+    # Переключаем статус
+    subtask.is_completed = not subtask.is_completed
+    db.session.commit()
+    
+    # Если все подзадачи выполнены, можно автоматически завершить задачу (опционально)
+    # if task.progress == 100 and task.status != 'completed':
+    #     task.status = 'completed'
+    #     db.session.commit()
+    #     flash('Все подзадачи выполнены! Задача завершена.', 'success')
+    
+    return redirect(url_for('task_detail', task_id=task.id))
+
+@app.route('/subtask/<int:subtask_id>/delete', methods=['POST'])
+@login_required
+def subtask_delete(subtask_id):
+    """Удаление подзадачи"""
+    subtask = Subtask.query.get_or_404(subtask_id)
+    task = subtask.parent_task
+    task_id = task.id
+    
+    # Проверяем доступ
+    if task.user_id != current_user.id:
+        flash('Нет доступа', 'danger')
+        return redirect(url_for('tasks'))
+    
+    db.session.delete(subtask)
+    db.session.commit()
+    flash('Подзадача удалена', 'success')
+    
+    return redirect(url_for('task_detail', task_id=task_id))
+
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Создаем таблицы при первом запуске
