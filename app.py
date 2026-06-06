@@ -6,7 +6,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date
 from werkzeug.utils import secure_filename
 import os
-
+import matplotlib
+matplotlib.use('Agg')  # Используем backend без GUI
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+from datetime import datetime, timedelta
+from collections import defaultdict
 
 from models import db, User, Task, Category, Tag, Subtask
 from forms import RegistrationForm, LoginForm, TaskForm, CategoryForm
@@ -94,8 +100,12 @@ def logout():
 
 @app.route('/dashboard')
 @login_required
+@app.route('/dashboard')
+@login_required
 def dashboard():
-    # Базовая статистика для дашборда
+    """Дашборд с аналитикой и графиками"""
+    
+    # Получаем все задачи пользователя
     tasks = Task.query.filter_by(user_id=current_user.id).all()
     total_tasks = len(tasks)
     completed_tasks = sum(1 for t in tasks if t.status == 'completed')
@@ -104,12 +114,126 @@ def dashboard():
     
     completion_rate = int((completed_tasks / total_tasks) * 100) if total_tasks > 0 else 0
     
+    # ===== 1. Распределение по приоритетам (круговая диаграмма) =====
+    priority_counts = {'high': 0, 'medium': 0, 'low': 0}
+    for task in tasks:
+        priority_counts[task.priority] += 1
+    
+    fig1, ax1 = plt.subplots(figsize=(6, 4))
+    priority_labels = ['Высокий', 'Средний', 'Низкий']
+    priority_sizes = [priority_counts['high'], priority_counts['medium'], priority_counts['low']]
+    priority_colors = ['#dc3545', '#ffc107', '#0dcaf0']
+    
+    # Убираем пустые значения
+    non_empty = [(l, s, c) for l, s, c in zip(priority_labels, priority_sizes, priority_colors) if s > 0]
+    if non_empty:
+        labels, sizes, colors = zip(*non_empty)
+        ax1.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
+        ax1.axis('equal')
+    else:
+        ax1.text(0.5, 0.5, 'Нет данных', ha='center', va='center')
+        ax1.axis('off')
+    
+    # Сохраняем график в base64
+    buf1 = BytesIO()
+    plt.savefig(buf1, format='png', bbox_inches='tight')
+    buf1.seek(0)
+    priority_chart = base64.b64encode(buf1.getvalue()).decode('utf-8')
+    plt.close()
+    
+    # ===== 2. Динамика выполнения по дням (последние 7 дней) =====
+    today = datetime.utcnow().date()
+    daily_completed = defaultdict(int)
+    
+    for task in tasks:
+        if task.status == 'completed' and task.updated_at:
+            completed_date = task.updated_at.date()
+            days_ago = (today - completed_date).days
+            if 0 <= days_ago <= 6:
+                daily_completed[completed_date] += 1
+    
+    # Сортируем по дате
+    dates = [(today - timedelta(days=i)) for i in range(6, -1, -1)]
+    completed_counts = [daily_completed[date] for date in dates]
+    date_labels = [d.strftime('%d.%m') for d in dates]
+    
+    fig2, ax2 = plt.subplots(figsize=(8, 4))
+    bars = ax2.bar(date_labels, completed_counts, color='#198754')
+    ax2.set_xlabel('Дата')
+    ax2.set_ylabel('Выполнено задач')
+    ax2.set_title('Динамика выполнения задач за последние 7 дней')
+    ax2.set_xticks(range(len(date_labels)))
+    ax2.set_xticklabels(date_labels, rotation=45)
+    
+    # Добавляем значения на столбцы
+    for bar, count in zip(bars, completed_counts):
+        if count > 0:
+            ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1, 
+                    str(count), ha='center', va='bottom')
+    
+    buf2 = BytesIO()
+    plt.savefig(buf2, format='png', bbox_inches='tight')
+    buf2.seek(0)
+    daily_chart = base64.b64encode(buf2.getvalue()).decode('utf-8')
+    plt.close()
+    
+    # ===== 3. Распределение по категориям =====
+    category_counts = defaultdict(int)
+    for task in tasks:
+        if task.category:
+            category_counts[task.category.name] += 1
+        else:
+            category_counts['Без категории'] += 1
+    
+    # Топ-5 категорий
+    top_categories = sorted(category_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+    
+    fig3, ax3 = plt.subplots(figsize=(6, 4))
+    if top_categories:
+        cat_labels = [c[0] for c in top_categories]
+        cat_sizes = [c[1] for c in top_categories]
+        ax3.barh(cat_labels, cat_sizes, color='#0d6efd')
+        ax3.set_xlabel('Количество задач')
+        ax3.set_title('Топ-5 категорий по количеству задач')
+    else:
+        ax3.text(0.5, 0.5, 'Нет данных', ha='center', va='center')
+        ax3.axis('off')
+    
+    buf3 = BytesIO()
+    plt.savefig(buf3, format='png', bbox_inches='tight')
+    buf3.seek(0)
+    category_chart = base64.b64encode(buf3.getvalue()).decode('utf-8')
+    plt.close()
+    
+    # ===== 4. Самая продуктивная неделя =====
+    weekly_stats = defaultdict(int)
+    for task in tasks:
+        if task.status == 'completed' and task.updated_at:
+            week_num = task.updated_at.isocalendar()[1]
+            year = task.updated_at.year
+            weekly_stats[(year, week_num)] += 1
+    
+    if weekly_stats:
+        best_week = max(weekly_stats, key=weekly_stats.get)
+        best_week_count = weekly_stats[best_week]
+        best_week_str = f"{best_week[0]}, неделя {best_week[1]}"
+    else:
+        best_week_str = "Нет данных"
+        best_week_count = 0
+    
     return render_template('dashboard.html',
                          total_tasks=total_tasks,
                          completed_tasks=completed_tasks,
                          overdue_tasks=overdue_tasks,
                          in_progress_tasks=in_progress_tasks,
-                         completion_rate=completion_rate)
+                         completion_rate=completion_rate,
+                         priority_chart=priority_chart,
+                         daily_chart=daily_chart,
+                         category_chart=category_chart,
+                         best_week_str=best_week_str,
+                         best_week_count=best_week_count)
+
+
 
 # Временный маршрут для проверки
 @app.route('/test')

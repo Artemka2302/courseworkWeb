@@ -5,6 +5,7 @@
 {% block content %}
 <h1 class="mb-4"><i class="bi bi-speedometer2"></i> Дашборд</h1>
 
+<!-- Карточки с метриками -->
 <div class="row mb-4">
     <div class="col-md-3 mb-3">
         <div class="card bg-primary text-white shadow">
@@ -23,14 +24,6 @@
         </div>
     </div>
     <div class="col-md-3 mb-3">
-        <div class="card bg-danger text-white shadow">
-            <div class="card-body">
-                <h5 class="card-title">Просрочено</h5>
-                <h2 class="display-4">{{ overdue_tasks }}</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
         <div class="card bg-warning text-dark shadow">
             <div class="card-body">
                 <h5 class="card-title">В работе</h5>
@@ -38,36 +31,104 @@
             </div>
         </div>
     </div>
+    <div class="col-md-3 mb-3">
+        <div class="card bg-danger text-white shadow">
+            <div class="card-body">
+                <h5 class="card-title">Просрочено</h5>
+                <h2 class="display-4">{{ overdue_tasks }}</h2>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="card shadow">
-            <div class="card-header">
-                <h5 class="mb-0">Прогресс выполнения</h5>
-            </div>
-            <div class="card-body text-center">
+<!-- Общий прогресс -->
+<div class="card mb-4 shadow">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0"><i class="bi bi-graph-up"></i> Общий прогресс</h5>
+    </div>
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-3 text-center">
                 <div class="display-1">{{ completion_rate }}%</div>
-                <div class="progress mt-3" style="height: 20px;">
-                    <div class="progress-bar bg-success" style="width: {{ completion_rate }}%"></div>
+                <small>выполнено</small>
+            </div>
+            <div class="col-md-9">
+                <div class="progress" style="height: 30px;">
+                    <div class="progress-bar bg-success progress-bar-striped" 
+                         style="width: {{ completion_rate }}%">
+                        {{ completion_rate }}%
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card shadow">
+</div>
+
+<!-- Графики -->
+<div class="row mb-4">
+    <!-- Распределение по приоритетам -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow h-100">
             <div class="card-header">
-                <h5 class="mb-0">Быстрые действия</h5>
+                <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Распределение по приоритетам</h5>
             </div>
-            <div class="card-body">
-                <a href="#" class="btn btn-primary w-100 mb-2">
-                    <i class="bi bi-plus-circle"></i> Создать задачу
-                </a>
-                <a href="#" class="btn btn-outline-secondary w-100">
-                    <i class="bi bi-calendar"></i> Перейти к календарю
-                </a>
+            <div class="card-body text-center">
+                {% if priority_chart %}
+                    <img src="data:image/png;base64,{{ priority_chart }}" alt="Приоритеты" class="img-fluid">
+                {% else %}
+                    <p class="text-muted">Нет данных для отображения</p>
+                {% endif %}
             </div>
         </div>
     </div>
+    
+    <!-- Распределение по категориям -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-tags"></i> Топ-5 категорий</h5>
+            </div>
+            <div class="card-body text-center">
+                {% if category_chart %}
+                    <img src="data:image/png;base64,{{ category_chart }}" alt="Категории" class="img-fluid">
+                {% else %}
+                    <p class="text-muted">Нет данных для отображения</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Динамика по дням -->
+<div class="card mb-4 shadow">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-calendar-week"></i> Динамика выполнения за последние 7 дней</h5>
+    </div>
+    <div class="card-body text-center">
+        {% if daily_chart %}
+            <img src="data:image/png;base64,{{ daily_chart }}" alt="Динамика" class="img-fluid">
+        {% else %}
+            <p class="text-muted">Нет данных для отображения</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Самая продуктивная неделя -->
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card shadow bg-success text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-trophy"></i> Самая продуктивная неделя</h5>
+                <h2 class="display-4">{{ best_week_count }}</h2>
+                <p class="mb-0">задач выполнено на {{ best_week_str }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4 text-center">
+    <a href="{{ url_for('tasks') }}" class="btn btn-primary">
+        <i class="bi bi-list-check"></i> Перейти к задачам
+    </a>
 </div>
 {% endblock %}
