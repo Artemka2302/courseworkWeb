@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from werkzeug.utils import secure_filename
 import os
 import matplotlib
@@ -14,7 +14,7 @@ import base64
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-from models import db, User, Task, Category, Tag, Subtask
+from models import db, User, Task, Category, Tag, Subtask, RecurringRule
 from forms import RegistrationForm, LoginForm, TaskForm, CategoryForm
 
 app = Flask(__name__)
@@ -303,27 +303,134 @@ def task_create():
     """Создание новой задачи"""
     form = TaskForm()
     
-    # Загружаем категории пользователя для выбора
     categories = Category.query.filter_by(user_id=current_user.id).all()
     form.category_id.choices = [(0, 'Без категории')] + [(c.id, c.name) for c in categories]
     
     if form.validate_on_submit():
+        # Если дедлайн не указан, ставим None
+        deadline = form.deadline.data if form.deadline.data else None
+        
         task = Task(
             title=form.title.data,
             description=form.description.data,
             status=form.status.data,
             priority=form.priority.data,
-            deadline=form.deadline.data,
+            deadline=deadline,
             category_id=form.category_id.data if form.category_id.data != 0 else None,
             user_id=current_user.id
         )
         db.session.add(task)
         db.session.commit()
         
+        # Создаем правило повторения, если задача повторяющаяся
+        if form.is_recurring.data:
+
+            print("=== ДИАГНОСТИКА ===")
+            print("recurrence_interval.data:", form.recurrence_interval.data)
+            print("recurrence_frequency.data:", form.recurrence_frequency.data)
+            print("deadline:", deadline)
+            # Для повторяющейся задачи без дедлайна используем текущую дату как стартовую
+            start_date = deadline if deadline else datetime.utcnow()
+            interval = form.recurrence_interval.data if form.recurrence_interval.data else 1
+            
+            rule = RecurringRule(
+                frequency=form.recurrence_frequency.data,
+                interval=interval,
+                end_date=form.recurrence_end_date.data if form.recurrence_end_date.data else None,
+                next_date=calculate_next_date(start_date, form.recurrence_frequency.data, interval),
+                is_active=True,
+                task_id=task.id
+            )
+            db.session.add(rule)
+            db.session.commit()
+        
         flash('Задача успешно создана!', 'success')
         return redirect(url_for('tasks'))
     
     return render_template('task_form.html', form=form, title='Создать задачу')
+
+def calculate_next_date(current_date, frequency, interval):
+    """Рассчитывает следующую дату для повторяющейся задачи"""
+    if not current_date:
+        return None
+    
+    if frequency == 'daily':
+        return current_date + timedelta(days=interval)
+    elif frequency == 'weekly':
+        return current_date + timedelta(weeks=interval)
+    elif frequency == 'monthly':
+        # Простое добавление месяцев (упрощённо)
+        next_month = current_date.month + interval
+        next_year = current_date.year + (next_month - 1) // 12
+        next_month = ((next_month - 1) % 12) + 1
+        try:
+            return current_date.replace(year=next_year, month=next_month)
+        except ValueError:
+            return current_date.replace(year=next_year, month=next_month, day=28)
+    return None
+
+@app.route('/task/<int:task_id>/complete-and-renew', methods=['POST'])
+@login_required
+def task_complete_and_renew(task_id):
+    """Отметить задачу выполненной и создать следующую по правилу повторения"""
+    task = Task.query.get_or_404(task_id)
+    
+    if task.user_id != current_user.id:
+        flash('Нет доступа', 'danger')
+        return redirect(url_for('tasks'))
+    
+    if task.status == 'completed':
+        flash('Задача уже выполнена', 'info')
+        return redirect(url_for('tasks'))
+    
+    # Отмечаем текущую задачу выполненной
+    task.status = 'completed'
+    task.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    # Если есть правило повторения и оно активно
+    if task.recurring_rule and task.recurring_rule.is_active:
+        rule = task.recurring_rule
+        
+        # Проверяем, не достигнута ли дата окончания
+        if rule.end_date and rule.end_date <= datetime.utcnow():
+            rule.is_active = False
+            db.session.commit()
+            flash('Задача выполнена! (Повторение завершено по достижении даты окончания)', 'success')
+            return redirect(url_for('tasks'))
+        
+        # Создаём новую задачу
+        new_task = Task(
+            title=task.title,
+            description=task.description,
+            status='pending',
+            priority=task.priority,
+            deadline=rule.next_date,
+            category_id=task.category_id,
+            user_id=current_user.id
+        )
+        db.session.add(new_task)
+        db.session.commit()
+        
+        # Обновляем правило для новой задачи
+        new_rule = RecurringRule(
+            frequency=rule.frequency,
+            interval=rule.interval,
+            end_date=rule.end_date,
+            next_date=calculate_next_date(rule.next_date, rule.frequency, rule.interval),
+            is_active=True,
+            task_id=new_task.id
+        )
+        db.session.add(new_rule)
+        
+        # Деактивируем старое правило
+        rule.is_active = False
+        db.session.commit()
+        
+        flash(f'Задача выполнена! Создана следующая задача на {new_task.deadline.strftime("%d.%m.%Y")}', 'success')
+    
+    return redirect(url_for('tasks'))
+
 
 @app.route('/task/<int:task_id>')
 @login_required
@@ -344,34 +451,64 @@ def task_edit(task_id):
     """Редактирование задачи"""
     task = Task.query.get_or_404(task_id)
     
-    # Проверяем доступ
     if task.user_id != current_user.id:
         flash('У вас нет доступа к этой задаче', 'danger')
         return redirect(url_for('tasks'))
     
     form = TaskForm(obj=task)
     
-    # Загружаем категории
     categories = Category.query.filter_by(user_id=current_user.id).all()
     form.category_id.choices = [(0, 'Без категории')] + [(c.id, c.name) for c in categories]
     
+    # Заполняем поля повторения, если они есть
+    if task.recurring_rule:
+        form.is_recurring.data = True
+        form.recurrence_frequency.data = task.recurring_rule.frequency
+        form.recurrence_interval.data = task.recurring_rule.interval
+        form.recurrence_end_date.data = task.recurring_rule.end_date
+    
     if form.validate_on_submit():
+        # Если дедлайн не указан, ставим None
+        deadline = form.deadline.data if form.deadline.data else None
+        
         task.title = form.title.data
         task.description = form.description.data
         task.status = form.status.data
         task.priority = form.priority.data
-        task.deadline = form.deadline.data
+        task.deadline = deadline
         task.category_id = form.category_id.data if form.category_id.data != 0 else None
         task.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        # Обновляем правило повторения
+        if form.is_recurring.data:
+            start_date = deadline if deadline else datetime.utcnow()
+            if task.recurring_rule:
+                task.recurring_rule.frequency = form.recurrence_frequency.data
+                task.recurring_rule.interval = form.recurrence_interval.data
+                task.recurring_rule.end_date = form.recurrence_end_date.data if form.recurrence_end_date.data else None
+                task.recurring_rule.next_date = calculate_next_date(start_date, form.recurrence_frequency.data, form.recurrence_interval.data)
+            else:
+                rule = RecurringRule(
+                    frequency=form.recurrence_frequency.data,
+                    interval=form.recurrence_interval.data,
+                    end_date=form.recurrence_end_date.data if form.recurrence_end_date.data else None,
+                    next_date=calculate_next_date(start_date, form.recurrence_frequency.data, form.recurrence_interval.data),
+                    is_active=True,
+                    task_id=task.id
+                )
+                db.session.add(rule)
+        else:
+            if task.recurring_rule:
+                db.session.delete(task.recurring_rule)
         
         db.session.commit()
         flash('Задача успешно обновлена!', 'success')
         return redirect(url_for('task_detail', task_id=task.id))
     
-    # Заполняем форму текущими значениями
     form.category_id.data = task.category_id if task.category_id else 0
-    
     return render_template('task_form.html', form=form, title='Редактировать задачу', task=task)
+
 
 @app.route('/task/<int:task_id>/delete', methods=['POST'])
 @login_required
@@ -754,5 +891,5 @@ def profile_settings():
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # Создаем таблицы при первом запуске
+        db.create_all()  
     app.run(debug=True)

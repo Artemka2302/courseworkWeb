@@ -1,7 +1,8 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, SelectField, TextAreaField, DateTimeField, BooleanField
-from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
+from wtforms import StringField, PasswordField, SubmitField, SelectField, TextAreaField, DateTimeField, BooleanField, IntegerField
+from wtforms.validators import DataRequired, Length, Email, EqualTo, Optional
 from datetime import datetime
+
 
 class RegistrationForm(FlaskForm):
     username = StringField('Имя пользователя', validators=[DataRequired(), Length(min=3, max=80)])
@@ -16,21 +17,7 @@ class LoginForm(FlaskForm):
     remember = BooleanField('Запомнить меня')
     submit = SubmitField('Войти')
 
-class TaskForm(FlaskForm):
-    title = StringField('Название задачи', validators=[DataRequired(), Length(max=200)])
-    description = TextAreaField('Описание')
-    status = SelectField('Статус', choices=[
-        ('pending', 'Ожидает'),
-        ('in_progress', 'В работе'),
-        ('completed', 'Выполнена')
-    ])
-    priority = SelectField('Приоритет', choices=[
-        ('low', 'Низкий'),
-        ('medium', 'Средний'),
-        ('high', 'Высокий')
-    ])
-    deadline = DateTimeField('Дедлайн (ГГГГ-ММ-ДД ЧЧ:ММ)', format='%Y-%m-%d %H:%M')
-    submit = SubmitField('Сохранить')
+
 
 class CategoryForm(FlaskForm):
     name = StringField('Название категории', validators=[DataRequired(), Length(max=50)])
@@ -60,17 +47,17 @@ class TaskForm(FlaskForm):
         ('medium', 'Средний'),
         ('high', 'Высокий')
     ])
-    deadline = DateTimeField('Дедлайн (ГГГГ-ММ-ДД ЧЧ:ММ)', format='%Y-%m-%d %H:%M', validators=[DataRequired()])
+    deadline = DateTimeField('Дедлайн (ГГГГ-ММ-ДД ЧЧ:ММ)', format='%Y-%m-%d %H:%M', validators=[])
     category_id = SelectField('Категория', coerce=int, choices=[], default=0)
     
-    # Новые поля для повторяющихся задач
+    # Поля для повторяющихся задач
     is_recurring = BooleanField('Повторяющаяся задача')
     recurrence_frequency = SelectField('Частота', choices=[
         ('daily', 'Ежедневно'),
         ('weekly', 'Еженедельно'),
         ('monthly', 'Ежемесячно')
     ], default='daily')
-    recurrence_interval = IntegerField('Интервал', default=1, validators=[DataRequired()])
-    recurrence_end_date = DateTimeField('Дата окончания (необязательно)', format='%Y-%m-%d %H:%M')
+    recurrence_interval = IntegerField('Интервал', default=1, validators=[Optional()])
+    recurrence_end_date = DateTimeField('Дата окончания (необязательно)', format='%Y-%m-%d %H:%M', validators=[Optional()])
     
     submit = SubmitField('Сохранить')

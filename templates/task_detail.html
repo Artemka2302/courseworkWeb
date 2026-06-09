@@ -135,6 +135,20 @@
                         —
                     {% endif %}
                 </p>
+                {% if task.recurring_rule and task.recurring_rule.is_active %}
+        <p><strong>🔄 Повторение:</strong> 
+            {% if task.recurring_rule.frequency == 'daily' %}
+                Каждые {{ task.recurring_rule.interval }} дн.
+            {% elif task.recurring_rule.frequency == 'weekly' %}
+                Каждые {{ task.recurring_rule.interval }} нед.
+            {% else %}
+                Каждые {{ task.recurring_rule.interval }} мес.
+            {% endif %}
+            {% if task.recurring_rule.end_date %}
+                <br><small>до {{ task.recurring_rule.end_date.strftime('%d.%m.%Y') }}</small>
+            {% endif %}
+        </p>
+    {% endif %}
                 <p><strong>Дедлайн:</strong> 
                     {% if task.deadline %}
                         {{ task.deadline.strftime('%d.%m.%Y %H:%M') }}
