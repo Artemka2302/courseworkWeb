@@ -751,6 +751,7 @@ def profile_settings():
     return redirect(url_for('profile'))
 
 
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Создаем таблицы при первом запуске

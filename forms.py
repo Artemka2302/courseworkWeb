@@ -61,5 +61,16 @@ class TaskForm(FlaskForm):
         ('high', 'Высокий')
     ])
     deadline = DateTimeField('Дедлайн (ГГГГ-ММ-ДД ЧЧ:ММ)', format='%Y-%m-%d %H:%M', validators=[DataRequired()])
-    category_id = SelectField('Категория', coerce=int, choices=[], default=0)  # Добавить это поле
+    category_id = SelectField('Категория', coerce=int, choices=[], default=0)
+    
+    # Новые поля для повторяющихся задач
+    is_recurring = BooleanField('Повторяющаяся задача')
+    recurrence_frequency = SelectField('Частота', choices=[
+        ('daily', 'Ежедневно'),
+        ('weekly', 'Еженедельно'),
+        ('monthly', 'Ежемесячно')
+    ], default='daily')
+    recurrence_interval = IntegerField('Интервал', default=1, validators=[DataRequired()])
+    recurrence_end_date = DateTimeField('Дата окончания (необязательно)', format='%Y-%m-%d %H:%M')
+    
     submit = SubmitField('Сохранить')

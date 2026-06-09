@@ -159,10 +159,16 @@
                 </table>
             </div>
         {% else %}
-            <p class="text-muted text-center py-4">У вас пока нет задач. 
-                <a href="{{ url_for('task_create') }}">Создайте первую задачу</a>
-            </p>
+    <p class="text-muted text-center py-4">
+        {% if current_filters.search %}
+            <i class="bi bi-search"></i> По запросу "{{ current_filters.search }}" задач не найдено.
+            <br><a href="{{ url_for('tasks') }}">Сбросить поиск</a>
+        {% else %}
+            У вас пока нет задач. 
+            <a href="{{ url_for('task_create') }}">Создайте первую задачу</a>
         {% endif %}
+    </p>
+{% endif %}
     </div>
 </div>
 {% endblock %}
