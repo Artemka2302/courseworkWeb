@@ -34,6 +34,13 @@ select option[value="completed"] { color: green; }
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+<li class="nav-item">
+    <a class="nav-link" href="{{ url_for('admin_panel') }}">
+        <i class="bi bi-shield-lock"></i> Админ-панель
+    </a>
+</li>
+{% endif %}
     <li class="nav-item">
         <a class="nav-link" href="{{ url_for('dashboard') }}">
             <i class="bi bi-speedometer2"></i> Дашборд

@@ -14,8 +14,24 @@ import base64
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-from models import db, User, Task, Category, Tag, Subtask, RecurringRule
+from models import db, User, Task, Category, Tag, Subtask, RecurringRule, Attachment
 from forms import RegistrationForm, LoginForm, TaskForm, CategoryForm
+
+# ========== Декоратор для проверки прав администратора ==========
+def admin_required(func):
+    """Декоратор: доступ только для администратора"""
+    from functools import wraps
+    @wraps(func)
+    def decorated_view(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash('Необходимо войти в систему', 'danger')
+            return redirect(url_for('login'))
+        if current_user.role != 'admin':
+            flash('У вас нет прав доступа к этой странице', 'danger')
+            return redirect(url_for('dashboard'))
+        return func(*args, **kwargs)
+    return decorated_view
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-change-this'
@@ -887,7 +903,309 @@ def profile_settings():
     flash('Настройки сохранены!', 'success')
     return redirect(url_for('profile'))
 
+# ========== Управление вложениями ==========
 
+@app.route('/task/<int:task_id>/attachment/upload', methods=['POST'])
+@login_required
+def upload_attachment(task_id):
+    """Загрузка файла-вложения к задаче"""
+    task = Task.query.get_or_404(task_id)
+    
+    if task.user_id != current_user.id:
+        flash('Нет доступа к этой задаче', 'danger')
+        return redirect(url_for('tasks'))
+    
+    if 'file' not in request.files:
+        flash('Файл не выбран', 'danger')
+        return redirect(url_for('task_detail', task_id=task.id))
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        flash('Файл не выбран', 'danger')
+        return redirect(url_for('task_detail', task_id=task.id))
+    
+    if file:
+        # Сохраняем файл
+        filename = secure_filename(file.filename)
+        # Добавляем временную метку к имени файла, чтобы избежать дублирования
+        name_parts = filename.rsplit('.', 1)
+        if len(name_parts) == 2:
+            filename = f"{name_parts[0]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{name_parts[1]}"
+        else:
+            filename = f"{filename}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Создаём папку пользователя
+        user_folder = os.path.join(app.config['UPLOAD_FOLDER'], str(current_user.id))
+        os.makedirs(user_folder, exist_ok=True)
+        
+        filepath = os.path.join(user_folder, filename)
+        file.save(filepath)
+        
+        # Сохраняем запись в БД
+        attachment = Attachment(
+            filename=file.filename,  # Оригинальное имя
+            filepath=filepath,
+            task_id=task.id
+        )
+        db.session.add(attachment)
+        db.session.commit()
+        
+        flash(f'Файл "{file.filename}" загружен!', 'success')
+    
+    return redirect(url_for('task_detail', task_id=task.id))
+
+@app.route('/attachment/<int:attachment_id>/delete', methods=['POST'])
+@login_required
+def delete_attachment(attachment_id):
+    """Удаление вложения"""
+    attachment = Attachment.query.get_or_404(attachment_id)
+    task = attachment.task
+    
+    if task.user_id != current_user.id:
+        flash('Нет доступа', 'danger')
+        return redirect(url_for('tasks'))
+    
+    # Удаляем файл с диска
+    if os.path.exists(attachment.filepath):
+        os.remove(attachment.filepath)
+    
+    db.session.delete(attachment)
+    db.session.commit()
+    
+    flash('Вложение удалено', 'success')
+    return redirect(url_for('task_detail', task_id=task.id))
+
+@app.route('/attachment/<int:attachment_id>/download')
+@login_required
+def download_attachment(attachment_id):
+    """Скачивание вложения"""
+    from flask import send_file
+    
+    attachment = Attachment.query.get_or_404(attachment_id)
+    task = attachment.task
+    
+    if task.user_id != current_user.id:
+        flash('Нет доступа', 'danger')
+        return redirect(url_for('tasks'))
+    
+    if os.path.exists(attachment.filepath):
+        return send_file(attachment.filepath, as_attachment=True, download_name=attachment.filename)
+    else:
+        flash('Файл не найден на сервере', 'danger')
+        return redirect(url_for('task_detail', task_id=task.id))
+    
+# ========== Административная панель ==========
+
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_panel():
+    """Главная страница админ-панели"""
+    users = User.query.all()
+    tasks = Task.query.all()
+    categories = Category.query.all()
+    attachments = Attachment.query.all()
+    
+    return render_template('admin/index.html',
+                         users=users,
+                         tasks=tasks,
+                         categories=categories,
+                         attachments=attachments)
+
+@app.route('/admin/users')
+@login_required
+@admin_required
+def admin_users():
+    """Управление пользователями"""
+    users = User.query.all()
+    return render_template('admin/users.html', users=users)
+
+@app.route('/admin/user/<int:user_id>/toggle-role', methods=['POST'])
+@login_required
+@admin_required
+def admin_toggle_role(user_id):
+    """Назначить/снять роль администратора"""
+    user = User.query.get_or_404(user_id)
+    
+    # Нельзя изменить роль самому себе
+    if user.id == current_user.id:
+        flash('Нельзя изменить роль самого себя', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    if user.role == 'admin':
+        user.role = 'user'
+        flash(f'Пользователь "{user.username}" лишён прав администратора', 'warning')
+    else:
+        user.role = 'admin'
+        flash(f'Пользователь "{user.username}" назначен администратором', 'success')
+    
+    db.session.commit()
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/user/<int:user_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_user(user_id):
+    """Удаление пользователя (со всеми его задачами)"""
+    user = User.query.get_or_404(user_id)
+    
+    if user.id == current_user.id:
+        flash('Нельзя удалить самого себя', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    db.session.delete(user)
+    db.session.commit()
+    flash(f'Пользователь "{user.username}" удалён', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/tasks')
+@login_required
+@admin_required
+def admin_tasks():
+    """Просмотр всех задач системы"""
+    tasks = Task.query.all()
+    users = User.query.all()
+    
+    status_filter = request.args.get('status', '')
+    user_filter = request.args.get('user', '')
+    
+    query = Task.query
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+    if user_filter and user_filter.isdigit():
+        query = query.filter_by(user_id=int(user_filter))
+    
+    tasks = query.all()
+    
+    return render_template('admin/tasks.html', 
+                         tasks=tasks, 
+                         users=users,
+                         status_filter=status_filter,
+                         user_filter=user_filter)
+
+@app.route('/admin/categories')
+@login_required
+@admin_required
+def admin_categories():
+    """Управление справочниками (категории всех пользователей)"""
+    categories = Category.query.all()
+    users = User.query.all()
+    
+    user_filter = request.args.get('user', '')
+    if user_filter and user_filter.isdigit():
+        categories = Category.query.filter_by(user_id=int(user_filter)).all()
+    
+    return render_template('admin/categories.html', 
+                         categories=categories, 
+                         users=users,
+                         user_filter=user_filter)
+
+@app.route('/admin/attachments')
+@login_required
+@admin_required
+def admin_attachments():
+    """Контроль файлов (все вложения системы)"""
+    attachments = Attachment.query.all()
+    return render_template('admin/attachments.html', attachments=attachments)
+
+@app.route('/admin/attachment/<int:attachment_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_attachment(attachment_id):
+    """Удаление вложения (администратор)"""
+    attachment = Attachment.query.get_or_404(attachment_id)
+    
+    if os.path.exists(attachment.filepath):
+        os.remove(attachment.filepath)
+    
+    db.session.delete(attachment)
+    db.session.commit()
+    flash('Вложение удалено', 'success')
+    return redirect(url_for('admin_attachments'))
+
+@app.route('/admin/statistics')
+@login_required
+@admin_required
+def admin_statistics():
+    """Общая аналитика по системе"""
+    total_users = User.query.count()
+    total_tasks = Task.query.count()
+    total_categories = Category.query.count()
+    total_attachments = Attachment.query.count()
+    
+    # Задачи по статусам
+    pending_tasks = Task.query.filter_by(status='pending').count()
+    in_progress_tasks = Task.query.filter_by(status='in_progress').count()
+    completed_tasks = Task.query.filter_by(status='completed').count()
+    
+    # Самый активный пользователь
+    from sqlalchemy import func
+    most_active = db.session.query(
+        User.username, 
+        func.count(Task.id).label('task_count')
+    ).join(Task, User.id == Task.user_id).group_by(User.id).order_by(func.count(Task.id).desc()).first()
+    
+    # Пользователи с ролями
+    admin_count = User.query.filter_by(role='admin').count()
+    user_count = User.query.filter_by(role='user').count()
+    
+    return render_template('admin/statistics.html',
+                         total_users=total_users,
+                         total_tasks=total_tasks,
+                         total_categories=total_categories,
+                         total_attachments=total_attachments,
+                         pending_tasks=pending_tasks,
+                         in_progress_tasks=in_progress_tasks,
+                         completed_tasks=completed_tasks,
+                         most_active=most_active,
+                         admin_count=admin_count,
+                         user_count=user_count)
+
+@app.route('/admin/export')
+@login_required
+@admin_required
+def admin_export():
+    """Служебная выгрузка всех данных (JSON)"""
+    import json
+    
+    users_data = []
+    for user in User.query.all():
+        users_data.append({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': user.role,
+            'registered_at': user.registered_at.strftime('%Y-%m-%d %H:%M:%S') if user.registered_at else None
+        })
+    
+    tasks_data = []
+    for task in Task.query.all():
+        tasks_data.append({
+            'id': task.id,
+            'title': task.title,
+            'status': task.status,
+            'priority': task.priority,
+            'deadline': task.deadline.strftime('%Y-%m-%d %H:%M:%S') if task.deadline else None,
+            'user_id': task.user_id
+        })
+    
+    data = {
+        'export_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'statistics': {
+            'total_users': len(users_data),
+            'total_tasks': len(tasks_data)
+        },
+        'users': users_data,
+        'tasks': tasks_data
+    }
+    
+    filename = f'admin_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+    
+    return json.dumps(data, ensure_ascii=False, indent=2), 200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': f'attachment; filename={filename}'
+    }
 
 if __name__ == '__main__':
     with app.app_context():

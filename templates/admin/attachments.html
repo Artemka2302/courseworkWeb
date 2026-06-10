@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Все вложения{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-paperclip"></i> Все вложения системы</h1>
+    <a href="{{ url_for('admin_panel') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Назад
+    </a>
+</div>
+
+<div class="card shadow">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Имя файла</th>
+                        <th>Задача</th>
+                        <th>Пользователь</th>
+                        <th>Загружено</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for attachment in attachments %}
+                    <tr>
+                        <td>{{ attachment.id }}</td>
+                        <td>
+                            <a href="{{ url_for('download_attachment', attachment_id=attachment.id) }}">
+                                {{ attachment.filename }}
+                            </a>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('task_detail', task_id=attachment.task.id) }}">
+                                {{ attachment.task.title }}
+                            </a>
+                        </td>
+                        <td>{{ attachment.task.author.username }}</td>
+                        <td>{{ attachment.uploaded_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>
+                            <form action="{{ url_for('admin_delete_attachment', attachment_id=attachment.id) }}" 
+                                  method="POST" class="d-inline"
+                                  onsubmit="return confirm('Удалить файл?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i> Удалить
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Все задачи системы{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-list-check"></i> Все задачи системы</h1>
+    <a href="{{ url_for('admin_panel') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Назад
+    </a>
+</div>
+
+<div class="card shadow">
+    <div class="card-body">
+        <!-- Фильтры -->
+        <form method="GET" class="row g-3 mb-4">
+            <div class="col-md-3">
+                <select name="status" class="form-select">
+                    <option value="">Все статусы</option>
+                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Ожидает</option>
+                    <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>В работе</option>
+                    <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Выполнена</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="user" class="form-select">
+                    <option value="">Все пользователи</option>
+                    {% for user in users %}
+                        <option value="{{ user.id }}" {% if user_filter == user.id|string %}selected{% endif %}>
+                            {{ user.username }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Фильтровать</button>
+            </div>
+            <div class="col-md-2">
+                <a href="{{ url_for('admin_tasks') }}" class="btn btn-secondary w-100">Сбросить</a>
+            </div>
+        </form>
+        
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Название</th>
+                        <th>Пользователь</th>
+                        <th>Статус</th>
+                        <th>Приоритет</th>
+                        <th>Дедлайн</th>
+                        <th>Прогресс</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td>{{ task.id }}</td>
+                        <td>
+                            <a href="{{ url_for('task_detail', task_id=task.id) }}">{{ task.title }}</a>
+                        </td>
+                        <td>{{ task.author.username }}</td>
+                        <td>
+                            {% if task.status == 'completed' %}
+                                <span class="badge bg-success">Выполнена</span>
+                            {% elif task.status == 'in_progress' %}
+                                <span class="badge bg-warning">В работе</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Ожидает</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if task.priority == 'high' %}
+                                <span class="badge bg-danger">Высокий</span>
+                            {% elif task.priority == 'medium' %}
+                                <span class="badge bg-warning">Средний</span>
+                            {% else %}
+                                <span class="badge bg-info">Низкий</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ task.deadline.strftime('%d.%m.%Y %H:%M') if task.deadline else '—' }}</td>
+                        <td>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-success" style="width: {{ task.progress }}%">
+                                    {{ task.progress }}%
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

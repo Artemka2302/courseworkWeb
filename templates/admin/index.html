@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Админ-панель{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-shield-lock"></i> Административная панель</h1>
+    <div>
+        <a href="{{ url_for('admin_export') }}" class="btn btn-outline-success">
+            <i class="bi bi-download"></i> Выгрузить все данные
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('admin_users') }}" class="text-decoration-none">
+            <div class="card bg-primary text-white shadow text-center">
+                <div class="card-body">
+                    <h1 class="display-4">{{ users|length }}</h1>
+                    <p class="mb-0">Пользователей</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('admin_tasks') }}" class="text-decoration-none">
+            <div class="card bg-success text-white shadow text-center">
+                <div class="card-body">
+                    <h1 class="display-4">{{ tasks|length }}</h1>
+                    <p class="mb-0">Задач</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('admin_categories') }}" class="text-decoration-none">
+            <div class="card bg-info text-white shadow text-center">
+                <div class="card-body">
+                    <h1 class="display-4">{{ categories|length }}</h1>
+                    <p class="mb-0">Категорий</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('admin_attachments') }}" class="text-decoration-none">
+            <div class="card bg-warning text-dark shadow text-center">
+                <div class="card-body">
+                    <h1 class="display-4">{{ attachments|length }}</h1>
+                    <p class="mb-0">Вложений</p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="card shadow">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="bi bi-person"></i> Быстрые ссылки</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('admin_users') }}">Управление пользователями</a>
+                        <span class="badge bg-primary rounded-pill">{{ users|length }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('admin_tasks') }}">Все задачи системы</a>
+                        <span class="badge bg-primary rounded-pill">{{ tasks|length }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('admin_categories') }}">Категории (справочник)</a>
+                        <span class="badge bg-primary rounded-pill">{{ categories|length }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('admin_attachments') }}">Все вложения</a>
+                        <span class="badge bg-primary rounded-pill">{{ attachments|length }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('admin_statistics') }}">Статистика системы</a>
+                        <span class="badge bg-info rounded-pill">Аналитика</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card shadow">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> О системе</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Роль текущего пользователя:</strong> 
+                    {% if current_user.role == 'admin' %}
+                        <span class="badge bg-danger">Администратор</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Пользователь</span>
+                    {% endif %}
+                </p>
+                <hr>
+                <p><strong>Всего в системе:</strong></p>
+                <ul>
+                    <li>Пользователей: {{ users|length }}</li>
+                    <li>Задач: {{ tasks|length }}</li>
+                    <li>Категорий: {{ categories|length }}</li>
+                    <li>Вложений: {{ attachments|length }}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
